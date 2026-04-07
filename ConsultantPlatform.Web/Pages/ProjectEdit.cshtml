@@ -1,0 +1,239 @@
+﻿@page
+@model ConsultantPlatform.Web.Pages.ProjectEditModel
+@{
+    ViewData["Title"] = "Edit Project";
+}
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+        <h1 class="mb-0">Edit project</h1>
+        <div id="subtitle" class="text-muted"></div>
+    </div>
+
+</div>
+
+
+<div class="card">
+    <div class="card-body">
+
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">Name</label>
+                <input id="pName" class="form-control" />
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">Status</label>
+                <select id="pStatus" class="form-select">
+                    <option value="Lead">Lead</option>
+                    <option value="Active">Active</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Invoiced">Invoiced</option>
+                </select>
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">Invoice overview</label>
+                <select id="pInvoiceOverview" class="form-select">
+                    <option value="false">No</option>
+                    <option value="true">Yes</option>
+                </select>
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">Start date</label>
+                <input id="pStartDate" type="date" class="form-control" />
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">End date</label>
+                <input id="pEndDate" type="date" class="form-control" />
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">Hourly rate</label>
+                <input id="pHourlyRate" type="number" class="form-control" min="0" value="0" />
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">Project price</label>
+                <input id="pProjectPrice" type="number" class="form-control" min="0" value="0" />
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label">Invoice number</label>
+                <input id="pInvoiceNumber" class="form-control" placeholder="Optional" />
+            </div>
+        </div>
+
+        <div class="mt-3 d-flex gap-2">
+            <button id="btnSave" class="btn btn-primary" type="button">Save</button>
+            <a id="btnCancel" class="btn btn-secondary" href="#">Cancel</a>
+        </div>
+
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const apiBase = window.auth.apiBase;
+
+        function qs(name) {
+            const url = new URL(window.location.href);
+            return url.searchParams.get(name);
+        }
+
+        function toDateOnly(value) {
+            if (!value) return "";
+            return String(value).split("T")[0];
+        }
+
+        function toggleDatesForCompleted() {
+            const status = (document.getElementById("pStatus").value ?? "").toLowerCase().trim();
+            const start = document.getElementById("pStartDate");
+            const end = document.getElementById("pEndDate");
+
+            const isCompleted = status === "completed";
+
+            start.disabled = isCompleted;
+            end.disabled = isCompleted;
+
+            // Hvis completed: blank datoer
+            if (isCompleted) {
+                start.value = "";
+                end.value = "";
+            }
+        }
+
+        async function loadProject(projectId) {
+            const res = await fetch(`${apiBase}/api/projects/${projectId}`, { credentials: "include" });
+            if (!res.ok) return null;
+            return await res.json();
+        }
+
+        async function saveProject(projectId) {
+            const btn = document.getElementById("btnSave");
+            btn.disabled = true;
+
+            try {
+                const name = document.getElementById("pName").value.trim();
+                const status = document.getElementById("pStatus").value;
+
+                const startDate = document.getElementById("pStartDate").value;
+                const endDate = document.getElementById("pEndDate").value;
+
+                const hourlyRate = Number(document.getElementById("pHourlyRate").value || 0);
+                const projectPrice = Number(document.getElementById("pProjectPrice").value || 0);
+
+                const invoiceNumber = document.getElementById("pInvoiceNumber").value.trim();
+                const invoiceOverview = document.getElementById("pInvoiceOverview").value === "true";
+
+                if (!name) {
+                    window.notifications.showError("Name is required.");
+                    return;
+                }
+
+                const isCompleted = (status ?? "").toLowerCase().trim() === "completed";
+
+                if (!isCompleted) {
+                    if (!startDate || !endDate) {
+                        window.notifications.showError("Start date and end date are required.");
+                        return;
+                    }
+
+                    const s = new Date(startDate);
+                    const e = new Date(endDate);
+
+                    if (e < s) {
+                        window.notifications.showError("End date must be after start date.");
+                        return;
+                    }
+                }
+
+                const payload = {
+                    name,
+                    status,
+                    startDate: isCompleted ? null : startDate,
+                    endDate: isCompleted ? null : endDate,
+                    hourlyRate,
+                    projectPrice,
+                    invoiceNumber: invoiceNumber ? invoiceNumber : null,
+                    invoiceOverview
+                };
+
+                const res = await fetch(`${apiBase}/api/projects/${projectId}`, {
+                    method: "PUT",
+                    credentials: "include",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!res.ok) {
+                    const errorMessage = await window.auth.getErrorMessage(res);
+                    window.notifications.showError(errorMessage);
+                    return;
+                }
+
+                const customerId = qs("customerId");
+                window.notifications.setFlashMessage("Project updated successfully.", "success");
+                window.location.href = `/CustomerProjects?id=${customerId}`;
+            }
+            catch (error) {
+                console.error("saveProject error:", error);
+                window.notifications.showError("An unexpected error occurred.");
+            }
+            finally {
+                btn.disabled = false;
+            }
+        }
+
+        (async () => {
+            try {
+                if (window.auth && !window.currentUser) {
+                    await window.auth.initNavbar();
+                }
+
+                const isAdmin = !!(window.auth && window.auth.isAdmin && window.auth.isAdmin(window.currentUser));
+                if (!isAdmin) {
+                    window.notifications.showError("Access denied. Admin only.");
+                    return;
+                }
+
+                const projectId = qs("id");
+                const customerId = qs("customerId");
+
+                if (!projectId) {
+                    window.notifications.showError("Missing project id.");
+                    return;
+                }
+
+                const backUrl = customerId ? `/CustomerProjects?id=${customerId}` : "/Customers";
+                document.getElementById("btnCancel").href = backUrl;
+
+                const p = await loadProject(projectId);
+                if (!p) {
+                    window.notifications.showError("Could not load project.");
+                    return;
+                }
+
+                document.getElementById("subtitle").textContent = p.name ?? "";
+                document.getElementById("pName").value = p.name ?? "";
+                document.getElementById("pStatus").value = p.status ?? "Lead";
+                document.getElementById("pStartDate").value = toDateOnly(p.startDate);
+                document.getElementById("pEndDate").value = toDateOnly(p.endDate);
+                document.getElementById("pHourlyRate").value = p.hourlyRate ?? 0;
+                document.getElementById("pProjectPrice").value = p.projectPrice ?? 0;
+                document.getElementById("pInvoiceNumber").value = p.invoiceNumber ?? "";
+                document.getElementById("pInvoiceOverview").value = p.invoiceOverview === true ? "true" : "false";
+
+                toggleDatesForCompleted();
+                document.getElementById("btnSave").addEventListener("click", () => saveProject(projectId));
+                document.getElementById("pStatus").addEventListener("change", toggleDatesForCompleted);
+            }
+            catch (error) {
+                console.error("ProjectEdit load error:", error);
+                window.notifications.showError("An unexpected error occurred while loading the project.");
+            }
+        })();
+    </script>
+}

@@ -1,0 +1,34 @@
+﻿@page
+@model ConsultantPlatform.Web.Pages.LogoutModel
+@{
+    ViewData["Title"] = "Logging out...";
+}
+
+<p>Logging out...</p>
+
+@section Scripts {
+    <script>
+        (async function () {
+            const apiBase = "https://localhost:7143";
+
+            // Logout on API (Identity cookie)
+            try {
+                await fetch(`${apiBase}/api/auth/logout`, {
+                    method: "POST",
+                    credentials: "include"
+                });
+            } catch (e) { }
+
+            // Clear client state
+            window.currentUser = null;
+
+            // Rebuild navbar (so Login shows and Logout hides)
+            if (window.auth && window.auth.initNavbar) {
+                await window.auth.initNavbar();
+            }
+
+            // Redirect
+            window.location.href = "/Login";
+        })();
+    </script>
+}

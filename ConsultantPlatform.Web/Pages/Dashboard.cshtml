@@ -1,0 +1,79 @@
+﻿@page
+@model ConsultantPlatform.Web.Pages.DashboardModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<div class="page-head">
+    <h1>Dashboard</h1>
+    <p class="muted">Overview of customers, projects, and upcoming deadlines.</p>
+</div>
+
+<div id="dashLoading" class="card">Loading dashboard…</div>
+
+<div id="dashContent" class="dash-grid" style="display:none;">
+    <section class="card">
+        <h2>Customers</h2>
+        <div class="stats-grid">
+            <div class="stats-grid">
+                <div class="stat stat-neutral"><div class="stat-label">Total</div><div class="stat-value" id="cTotal">0</div></div>
+                <div class="stat stat-cust-lead"><div class="stat-label">Lead</div><div class="stat-value" id="cLead">0</div></div>
+                <div class="stat stat-cust-active"><div class="stat-label">Active</div><div class="stat-value" id="cActive">0</div></div>
+                <div class="stat stat-cust-projectclient"><div class="stat-label">Project Client</div><div class="stat-value" id="cProjectClient">0</div></div>
+                <div class="stat stat-cust-inactive"><div class="stat-label">Inactive</div><div class="stat-value" id="cInactive">0</div></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="card">
+        <h2>Projects</h2>
+        <div class="stats-grid">
+            <div class="stat stat-neutral"><div class="stat-label">Total</div><div class="stat-value" id="pTotal">0</div></div>
+            <div class="stat stat-lead"><div class="stat-label">Lead</div><div class="stat-value" id="pLead">0</div></div>
+            <div class="stat stat-active"><div class="stat-label">Active</div><div class="stat-value" id="pActive">0</div></div>
+            <div class="stat stat-completed"><div class="stat-label">Completed</div><div class="stat-value" id="pCompleted">0</div></div>
+            <div class="stat stat-invoiced"><div class="stat-label">Invoiced</div><div class="stat-value" id="pInvoiced">0</div></div>
+        </div>
+    </section>
+
+    <section class="card dash-wide">
+        <h2>Next deadlines</h2>
+        <div class="muted">Top 5 projects with the closest end date.</div>
+
+        <div class="table-wrap">
+            <table class="table table-sm" id="deadlinesTable">
+                <thead>
+                    <tr>
+                        <th>Project</th>
+                        <th>Customer</th>
+                        <th>Status</th>
+                        <th>End date</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<section id="recentActivitySection" class="card dash-wide mt-4" style="display:none;">
+    <h2>Recent Activity</h2>
+    <div class="muted">Latest system activity, including customer, project, document, and sign-in events.</div>
+
+    <div class="table-wrap">
+        <table class="table table-sm" id="recentActivityTable">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Summary</th>
+                    <th>User</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</section>
+
+@section Scripts {
+    <script src="~/js/dashboard.js"></script>
+}

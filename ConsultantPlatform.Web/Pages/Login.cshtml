@@ -1,0 +1,81 @@
+﻿@page
+@model ConsultantPlatform.Web.Pages.LoginModel
+@{
+    ViewData["Title"] = "Login";
+}
+
+<h2>Login</h2>
+
+<div class="row">
+    <div class="col-md-5">
+        <div class="mb-3">
+            <label class="form-label">Email</label>
+            <input id="email" class="form-control" value="dasekan@gmail.com" />
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Password</label>
+            <input id="password" type="password" class="form-control" value="**********" />
+        </div>
+
+        <button id="btnLogin" class="btn btn-primary" type="button">Login</button>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const apiBase = window.auth.apiBase;
+
+        async function login() {
+            const btn = document.getElementById("btnLogin");
+            btn.disabled = true;
+
+            try {
+                const email = document.getElementById("email").value.trim();
+                const password = document.getElementById("password").value;
+
+                if (!email) {
+                    window.notifications.showError("Email is required.");
+                    return;
+                }
+
+                if (!password) {
+                    window.notifications.showError("Password is required.");
+                    return;
+                }
+
+                const res = await fetch(`${apiBase}/api/auth/login`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({ email, password })
+                });
+
+                if (!res.ok) {
+                    const msg = await window.auth.getErrorMessage(res);
+                    window.notifications.showError(msg);
+                    return;
+                }
+
+                window.notifications.setFlashMessage("Logged in successfully.", "success");
+                window.location.href = "/Dashboard";
+            }
+            catch {
+                window.notifications.showError("An unexpected error occurred.");
+            }
+            finally {
+                btn.disabled = false;
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            document.getElementById("btnLogin").addEventListener("click", login);
+
+            document.getElementById("password").addEventListener("keydown", function (event) {
+                if (event.key === "Enter") {
+                    login();
+                }
+            });
+        });
+    </script>
+}

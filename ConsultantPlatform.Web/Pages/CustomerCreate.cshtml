@@ -1,0 +1,118 @@
+﻿@page
+@model ConsultantPlatform.Web.Pages.CustomerCreateModel
+@{
+    ViewData["Title"] = "Create Customer";
+}
+
+<h1>Create Customer</h1>
+
+
+<div class="mb-3">
+    <label class="form-label">Name</label>
+    <input id="name" class="form-control" />
+</div>
+
+<div class="mb-3">
+    <label class="form-label">Email</label>
+    <input id="email" class="form-control" />
+</div>
+
+<div class="mb-3">
+    <label class="form-label">Phone</label>
+    <input id="phone" class="form-control" />
+</div>
+
+<div class="mb-3">
+    <label class="form-label">Notes</label>
+    <textarea id="notes" class="form-control"></textarea>
+</div>
+
+<div class="mb-3">
+    <label class="form-label">Status</label>
+    <select id="customerStatus" class="form-select">
+        <option>Active</option>
+        <option>Inactive</option>
+        <option selected>Lead</option>
+        <option>Project Client</option>
+    </select>
+</div>
+
+<div class="mb-3">
+    <label class="form-label">Service Type</label>
+    <select id="serviceType" class="form-select">
+        <option selected>Branding</option>
+        <option>Social Media</option>
+        <option>Paid Ads</option>
+        <option>SEO</option>
+        <option>Web Design</option>
+        <option>Web Optimization</option>
+        <option>Content Creation</option>
+    </select>
+</div>
+
+<div class="mb-3">
+    <label class="form-label">CVR</label>
+    <input id="cvr" class="form-control" />
+</div>
+
+<div class="mb-3">
+    <label class="form-label">Industry</label>
+    <input id="industry" class="form-control" />
+</div>
+
+<button id="btnCreate" type="button" class="btn btn-primary">Create Customer</button>
+
+@section Scripts {
+    <script>
+        const apiBase = window.auth.apiBase;
+
+        async function createCustomer() {
+            const btn = document.getElementById("btnCreate");
+            btn.disabled = true;
+
+            try {
+                const name = document.getElementById("name").value.trim();
+                if (!name) {
+                    window.notifications.showError("Name is required.");
+                    return;
+                }
+
+                const payload = {
+                    name: name,
+                    email: document.getElementById("email").value.trim() || null,
+                    phone: document.getElementById("phone").value.trim(),
+                    notes: document.getElementById("notes").value.trim(),
+                    status: document.getElementById("customerStatus").value,
+                    serviceType: document.getElementById("serviceType").value,
+                    cvr: document.getElementById("cvr").value.trim(),
+                    industry: document.getElementById("industry").value.trim()
+                };
+
+                const res = await fetch(`${apiBase}/api/customers`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify(payload)
+                });
+
+                if (!res.ok) {
+                    const errorMessage = await window.auth.getErrorMessage(res);
+                    window.notifications.showError(errorMessage);
+                    return;
+                }
+
+                window.notifications.setFlashMessage("Customer created successfully.", "success");
+                window.location.href = "/Customers";
+            }
+            catch (error) {
+                window.notifications.showError("An unexpected error occurred.");
+            }
+            finally {
+                btn.disabled = false;
+            }
+        }
+
+        document.getElementById("btnCreate").addEventListener("click", createCustomer);
+    </script>
+}
+

@@ -1,0 +1,34 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Home";
+}
+
+<div class="hero">
+    <div class="hero-inner">
+        <h1>Consultant Platform</h1>
+        <p class="hero-sub">
+            Manage customers, projects, and documents — fast, structured, and secure.
+        </p>
+
+        <div class="hero-actions">
+            <a class="btn btn-primary" asp-page="/Dashboard">Open dashboard</a>
+            <a class="btn btn-primary" asp-page="/Customers">Go to customers</a>
+        </div>
+
+        <div class="hero-cards">
+            <div class="card feature">
+                <h3>Customers</h3>
+                <p>Create and maintain customer data, status, and service types.</p>
+            </div>
+            <div class="card feature">
+                <h3>Projects</h3>
+                <p>Track status, pricing, and deadlines — always know what’s next.</p>
+            </div>
+            <div class="card feature">
+                <h3>Documents</h3>
+                <p>Upload and manage customer documents with secure storage.</p>
+            </div>
+        </div>
+    </div>
+</div>

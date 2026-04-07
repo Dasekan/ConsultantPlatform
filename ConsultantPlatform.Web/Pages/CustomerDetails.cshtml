@@ -1,0 +1,243 @@
+﻿@page
+@model ConsultantPlatform.Web.Pages.CustomerDetailsModel
+@{
+    ViewData["Title"] = "Customer";
+}
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+        <h1 class="mb-0">Customer</h1>
+    </div>
+
+    <div class="d-flex gap-2">
+        <a class="btn btn-secondary" href="/Customers">Back to Customers</a>
+        <a id="btnProjects" class="btn btn-primary" href="#">Projects</a>
+        <a id="btnEdit" class="btn btn-primary" href="#" style="display:none;">Edit</a>
+    </div>
+</div>
+
+<div id="status" class="mb-3 text-danger"></div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="row g-3">
+
+            <div class="col-md-6">
+                <div class="text-muted small">Name</div>
+                <div id="cName" class="fw-semibold">-</div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="text-muted small">Email</div>
+                <div id="cEmail">-</div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="text-muted small">Phone</div>
+                <div id="cPhone">-</div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="text-muted small">Status</div>
+                <div id="cStatus">-</div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="text-muted small">Service type</div>
+                <div id="cServiceType">-</div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="text-muted small">CVR</div>
+                <div id="cCvr">-</div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="text-muted small">Industry</div>
+                <div id="cIndustry">-</div>
+            </div>
+
+            <div class="col-12">
+                <div class="text-muted small">Notes</div>
+                <div id="cNotes" class="fw-normal"></div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<div class="card mt-4">
+    <div class="card-body">
+        <h2 class="h4 mb-3">Customer Overview</h2>
+
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+                <tbody>
+                    <tr>
+                        <th style="width: 260px;">Total projects</th>
+                        <td id="ovTotalProjects">-</td>
+                    </tr>
+                    <tr>
+                        <th>Active projects</th>
+                        <td id="ovActiveProjects">-</td>
+                    </tr>
+                    <tr>
+                        <th>Completed projects</th>
+                        <td id="ovCompletedProjects">-</td>
+                    </tr>
+                    <tr>
+                        <th>Invoiced projects</th>
+                        <td id="ovInvoicedProjects">-</td>
+                    </tr>
+                    <tr>
+                        <th>Total project value</th>
+                        <td id="ovTotalProjectValue">-</td>
+                    </tr>
+                    <tr>
+                        <th>Next deadline</th>
+                        <td id="ovNextDeadline">-</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const apiBase = "https://localhost:7143";
+
+        function qs(name) {
+            const url = new URL(window.location.href);
+            return url.searchParams.get(name);
+        }
+
+        function setError(msg) {
+            const el = document.getElementById("status");
+            el.className = "mb-3 text-danger";
+            el.innerText = msg;
+        }
+
+        function clearStatus() {
+            document.getElementById("status").innerText = "";
+        }
+
+        function statusBadge(status) {
+            const s = (status ?? "").toLowerCase();
+            if (s === "active") return `<span class="badge bg-success">Active</span>`;
+            if (s === "inactive") return `<span class="badge bg-secondary">Inactive</span>`;
+            if (s === "lead") return `<span class="badge bg-warning text-dark">Lead</span>`;
+            if (s === "project client") return `<span class="badge bg-primary">Project client</span>`;
+            return `<span class="badge bg-light text-dark">${status ?? ""}</span>`;
+        }
+
+        function formatMoney(value) {
+            const number = Number(value ?? 0);
+            return number.toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        function formatDate(value) {
+            if (!value) return "-";
+
+            const date = new Date(value);
+            if (isNaN(date)) return "-";
+
+            return date.toLocaleDateString("en-GB");
+        }
+
+        async function loadCustomerProjects(customerId) {
+            const res = await fetch(`${apiBase}/api/customers/${customerId}/projects`, {
+                credentials: "include"
+            });
+
+            if (!res.ok) {
+                const msg = await window.auth.getErrorMessage(res);
+                throw new Error(msg);
+            }
+
+            return await res.json();
+        }
+
+        function renderCustomerOverview(projects) {
+            const list = Array.isArray(projects) ? projects : [];
+
+            const totalProjects = list.length;
+            const activeProjects = list.filter(p => (p.status ?? "").toLowerCase() === "active").length;
+            const completedProjects = list.filter(p => (p.status ?? "").toLowerCase() === "completed").length;
+            const invoicedProjects = list.filter(p => (p.status ?? "").toLowerCase() === "invoiced").length;
+
+            const totalProjectValue = list.reduce((sum, p) => {
+                return sum + Number(p.projectPrice ?? 0);
+            }, 0);
+
+            const upcoming = list
+                .filter(p =>
+                    p.endDate &&
+                    (p.status ?? "").toLowerCase() !== "completed")
+                .sort((a, b) => new Date(a.endDate) - new Date(b.endDate));
+
+            const nextDeadline = upcoming.length > 0
+                ? `${upcoming[0].name ?? "-"} (${formatDate(upcoming[0].endDate)})`
+                : "-";
+
+            document.getElementById("ovTotalProjects").textContent = totalProjects;
+            document.getElementById("ovActiveProjects").textContent = activeProjects;
+            document.getElementById("ovCompletedProjects").textContent = completedProjects;
+            document.getElementById("ovInvoicedProjects").textContent = invoicedProjects;
+            document.getElementById("ovTotalProjectValue").textContent = formatMoney(totalProjectValue);
+            document.getElementById("ovNextDeadline").textContent = nextDeadline;
+        }
+
+        (async () => {
+            try {
+                if (window.auth && !window.currentUser && window.auth.initNavbar) {
+                    await window.auth.initNavbar();
+                }
+            } catch (e) {
+                console.error(e);
+            }
+
+            const id = qs("id");
+            if (!id) {
+                setError("Missing customer id in URL.");
+                return;
+            }
+
+            // Set button links
+            document.getElementById("btnProjects").href = "/CustomerProjects?id=" + id;
+
+            const isAdmin = !!(window.auth && window.auth.isAdmin && window.auth.isAdmin(window.currentUser));
+            const btnEdit = document.getElementById("btnEdit");
+            btnEdit.href = "/CustomerEdit?id=" + id;
+            btnEdit.style.display = isAdmin ? "inline-block" : "none";
+
+            clearStatus();
+
+            const res = await fetch(`${apiBase}/api/customers/${id}`, { credentials: "include" });
+
+            if (!res.ok) {
+                const msg = await window.auth.getErrorMessage(res);
+                setError(msg);
+                return;
+            }
+
+            const c = await res.json();
+
+            // Fields
+            document.getElementById("cName").textContent = c.name ?? "-";
+            document.getElementById("cEmail").textContent = c.email ?? "-";
+            document.getElementById("cPhone").textContent = c.phone ?? "-";
+            document.getElementById("cServiceType").textContent = c.serviceType ?? "-";
+            document.getElementById("cCvr").textContent = c.cvr ?? "-";
+            document.getElementById("cIndustry").textContent = c.industry ?? "-";
+            document.getElementById("cNotes").textContent = c.notes ?? "-";
+            document.getElementById("cStatus").innerHTML = statusBadge(c.status);
+
+            const projects = await loadCustomerProjects(id);
+            renderCustomerOverview(projects);
+        })();
+    </script>
+}

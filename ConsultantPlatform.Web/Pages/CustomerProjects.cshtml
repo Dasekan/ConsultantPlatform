@@ -1,0 +1,400 @@
+﻿@page
+@model ConsultantPlatform.Web.Pages.CustomerProjectsModel
+@{
+    ViewData["Title"] = "Customer Projects";
+}
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+        <h1 class="mb-0">Projects</h1>
+        <div id="customerSubtitle" class="text-muted"></div>
+    </div>
+
+    <a class="btn btn-primary" href="/Customers">Back to Customers</a>
+</div>
+
+<div class="row mb-3">
+    <div class="col-md-3">
+        <select id="statusFilter" class="form-select">
+            <option value="">All Statuses</option>
+            <option value="Lead">Lead</option>
+            <option value="Active">Active</option>
+            <option value="Completed">Completed</option>
+            <option value="Invoiced">Invoiced</option>
+        </select>
+    </div>
+</div>
+<!-- Admin: Create project button -->
+<div class="mb-3">
+    <button id="btnToggleCreate" class="btn btn-success" type="button" style="display:none;"
+            data-bs-toggle="collapse" data-bs-target="#createPanel" aria-expanded="false">
+        Add Project
+    </button>
+</div>
+
+<!-- Create panel -->
+<div class="collapse" id="createPanel">
+    <div class="card mb-4">
+        <div class="card-header">
+            Add project
+        </div>
+        <div class="card-body">
+
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Name</label>
+                    <input id="pName" class="form-control" placeholder="Project name" />
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <select id="pStatus" class="form-select">
+                        <option value="Lead">Lead</option>
+                        <option value="Active">Active</option>
+                        <option value="Invoiced">Invoiced</option>
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label">Hourly rate</label>
+                    <input id="pHourlyRate" type="number" class="form-control" value="0" min="0" />
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">Invoice overview</label>
+                    <select id="pInvoiceOverview" class="form-select">
+                        <option value="false">No</option>
+                        <option value="true">Yes</option>
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">Start date</label>
+                    <input id="pStartDate" type="date" class="form-control" />
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">End date</label>
+                    <input id="pEndDate" type="date" class="form-control" />
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">Project price</label>
+                    <input id="pProjectPrice" type="number" class="form-control" value="0" min="0" />
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">Invoice number</label>
+                    <input id="pInvoiceNumber" class="form-control" placeholder="Optional" />
+                </div>
+            </div>
+
+            <div class="mt-3 d-flex gap-2">
+                <button id="btnCreate" class="btn btn-primary" type="button">Create Project</button>
+                <button class="btn btn-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#createPanel">
+                    Cancel
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Projects table -->
+<div class="table-responsive" style="overflow: visible;">
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Status</th>
+                <th>Deadline</th>
+                <th>Hourly rate</th>
+                <th>Project price</th>
+                <th>Invoice number</th>
+                <th>Invoice overview</th>
+                <th id="thManage" class="text-end" style="display:none; width:140px;">Manage</th>
+            </tr>
+        </thead>
+        <tbody id="projectsBody"></tbody>
+    </table>
+</div>
+
+@section Scripts {
+    <script>
+        const apiBase = window.auth.apiBase;
+        let isAdmin = false;
+
+        function qs(name) {
+            return new URL(window.location.href).searchParams.get(name);
+        }
+
+
+
+        function statusBadge(status) {
+            switch (status) {
+                case "Lead": return `<span class="badge bg-warning text-dark">Lead</span>`;
+                case "Active": return `<span class="badge bg-primary">Active</span>`;
+                case "Completed": return `<span class="badge bg-success">Completed</span>`;
+                case "Invoiced": return `<span class="badge bg-invoiced">Invoiced</span>`;
+                default: return `<span class="badge bg-secondary">${status ?? ""}</span>`;
+            }
+        }
+
+        function deadlineText(status, startDate, endDate) {
+            // Completed projects should not show deadline
+            if ((status ?? "").toLowerCase().trim() === "completed") return "—";
+
+            if (!startDate || !endDate) return "-";
+
+            const s = new Date(startDate);
+            const e = new Date(endDate);
+            const days = Math.round((e - s) / (1000 * 60 * 60 * 24));
+
+            return isNaN(days) ? "-" : `${days} days`;
+        }
+
+
+        function yesNo(value) {
+            return value ? "Yes" : "No";
+        }
+
+        async function loadCustomer(customerId) {
+            const res = await fetch(`${apiBase}/api/customers/${customerId}`, { credentials: "include" });
+            if (!res.ok) return null;
+            return await res.json();
+        }
+
+        async function loadProjects(customerId) {
+            const status = document.getElementById("statusFilter").value;
+            const url = `${apiBase}/api/customers/${customerId}/projects?status=${encodeURIComponent(status)}`;
+
+            try {
+                const res = await fetch(url, {
+                    credentials: "include",
+                    cache: "no-store"
+                });
+
+                if (!res.ok) {
+                    const errorMessage = await window.auth.getErrorMessage(res);
+                    window.notifications.showError(errorMessage);
+                    return [];
+                }
+
+                const data = await res.json();
+                return Array.isArray(data) ? data : [];
+            }
+            catch {
+                window.notifications.showError("An unexpected error occurred.");
+                return [];
+            }
+        }
+
+        function renderProjects(projects) {
+            const tbody = document.getElementById("projectsBody");
+            tbody.innerHTML = "";
+
+            if (!Array.isArray(projects) || projects.length === 0) {
+                tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="text-muted text-center">
+                        No projects found.
+                    </td>
+                </tr>`;
+                return;
+            }
+
+            for (const p of projects) {
+                const tr = document.createElement("tr");
+
+                tr.innerHTML = `
+                    <td>${p.name ?? ""}</td>
+                    <td>${statusBadge(p.status)}</td>
+                    <td>${deadlineText(p.status, p.startDate, p.endDate)}</td>
+                    <td>${p.hourlyRate ?? 0}</td>
+                    <td>${p.projectPrice ?? 0}</td>
+                    <td>${p.invoiceNumber ?? ""}</td>
+                    <td>${yesNo(p.invoiceOverview)}</td>
+                `;
+
+                if (isAdmin) {
+                    const tdManage = document.createElement("td");
+                    tdManage.className = "text-end";
+
+                    tdManage.innerHTML = `
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-sm btn-secondary dropdown-toggle"
+                                data-bs-toggle="dropdown">
+                                Manage
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li>
+                                    <a class="dropdown-item"
+                                       href="/ProjectEdit?id=${p.id}&customerId=${p.customerId}">
+                                       Edit
+                                    </a>
+                                </li>
+                                <li>
+                                    <button class="dropdown-item text-danger"
+                                            onclick="deleteProject(${p.id})">
+                                        Delete
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                    `;
+
+                    tr.appendChild(tdManage);
+                }
+
+                tbody.appendChild(tr);
+            }
+        }
+
+        async function createProject(customerId) {
+            const btn = document.getElementById("btnCreate");
+            btn.disabled = true;
+
+            try {
+                const statusVal = document.getElementById("pStatus").value;
+                const nameVal = document.getElementById("pName").value.trim();
+                const startVal = document.getElementById("pStartDate").value;
+                const endVal = document.getElementById("pEndDate").value;
+
+                if (!nameVal) {
+                    window.notifications.showError("Name is required.");
+                    return;
+                }
+
+                if (!startVal || !endVal) {
+                    window.notifications.showError("Start date and end date are required.");
+                    return;
+                }
+
+                const s = new Date(startVal);
+                const e = new Date(endVal);
+
+                if (e < s) {
+                    window.notifications.showError("End date must be the same as or after start date.");
+                    return;
+                }
+
+                const payload = {
+                    name: nameVal,
+                    status: statusVal,
+                    startDate: startVal,
+                    endDate: endVal,
+                    hourlyRate: Number(document.getElementById("pHourlyRate").value || 0),
+                    projectPrice: Number(document.getElementById("pProjectPrice").value || 0),
+                    invoiceNumber: document.getElementById("pInvoiceNumber").value.trim() || null,
+                    invoiceOverview: document.getElementById("pInvoiceOverview").value === "true"
+                };
+
+                const res = await fetch(`${apiBase}/api/customers/${customerId}/projects`, {
+                    method: "POST",
+                    credentials: "include",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!res.ok) {
+                    const errorMessage = await window.auth.getErrorMessage(res);
+                    window.notifications.showError(errorMessage);
+                    return;
+                }
+
+                window.notifications.showSuccess("Project created successfully.");
+
+                const projects = await loadProjects(customerId);
+                renderProjects(projects);
+
+                document.getElementById("pName").value = "";
+                document.getElementById("pStatus").value = "Lead";
+                document.getElementById("pHourlyRate").value = "0";
+                document.getElementById("pInvoiceOverview").value = "false";
+                document.getElementById("pStartDate").value = "";
+                document.getElementById("pEndDate").value = "";
+                document.getElementById("pProjectPrice").value = "0";
+                document.getElementById("pInvoiceNumber").value = "";
+
+                const panelEl = document.getElementById("createPanel");
+                const collapseInstance = bootstrap.Collapse.getOrCreateInstance(panelEl);
+                collapseInstance.hide();
+            }
+            catch {
+                window.notifications.showError("An unexpected error occurred.");
+            }
+            finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function deleteProject(projectId) {
+            const confirmed = await window.notifications.confirmAction(
+                "Are you sure you want to delete this project?"
+            );
+
+            if (!confirmed) return;
+
+            try {
+                const res = await fetch(`${apiBase}/api/projects/${projectId}`, {
+                    method: "DELETE",
+                    credentials: "include"
+                });
+
+                if (!res.ok) {
+                    const errorMessage = await window.auth.getErrorMessage(res);
+                    window.notifications.showError(errorMessage);
+                    return;
+                }
+
+                const customerId = Number(qs("id"));
+                const projects = await loadProjects(customerId);
+                renderProjects(projects);
+
+                window.notifications.showSuccess("Project deleted successfully.");
+            }
+            catch {
+                window.notifications.showError("An unexpected error occurred.");
+            }
+        }
+
+        (async () => {
+            try {
+                if (window.auth && !window.currentUser) {
+                    await window.auth.initNavbar();
+                }
+
+                const customerId = Number(qs("id"));
+                if (!customerId) {
+                    window.notifications.showError("Invalid customer id in URL.");
+                    return;
+                }
+
+                isAdmin = !!(window.auth && window.auth.isAdmin && window.auth.isAdmin(window.currentUser));
+                document.getElementById("thManage").style.display = isAdmin ? "" : "none";
+                document.getElementById("btnToggleCreate").style.display = isAdmin ? "inline-block" : "none";
+
+                const cust = await loadCustomer(customerId);
+                if (cust) {
+                    document.getElementById("customerSubtitle").textContent =
+                        `${cust.name ?? ""} (${cust.email ?? "No email"})`;
+                }
+
+                document.getElementById("btnCreate")
+                    .addEventListener("click", () => createProject(customerId));
+
+                document.getElementById("statusFilter")
+                    .addEventListener("change", async () => {
+                        const projects = await loadProjects(customerId);
+                        renderProjects(projects);
+                    });
+
+                const projects = await loadProjects(customerId);
+                renderProjects(projects);
+            }
+            catch {
+                window.notifications.showError("An unexpected error occurred.");
+            }
+        })();
+    </script>
+}

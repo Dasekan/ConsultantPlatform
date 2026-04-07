@@ -1,0 +1,155 @@
+﻿@page
+@model ConsultantPlatform.Web.Pages.DocumentCreateModel
+@{
+    ViewData["Title"] = "Upload Document";
+}
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+        <h1 class="mb-0">Upload Document</h1>
+        <div id="subtitle" class="text-muted"></div>
+    </div>
+</div>
+
+
+<div class="card">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">Document name</label>
+                <input id="dName" class="form-control" placeholder="e.g. Contract - March 2026" />
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label">Document type</label>
+                <select id="dType" class="form-select">
+                    <option value="Contract">Contract</option>
+                    <option value="Onboarding">Onboarding</option>
+                    <option value="AgreementSummary">Agreement Summary</option>
+                </select>
+            </div>
+
+            <div class="col-12">
+                <label class="form-label">Notes</label>
+                <textarea id="dNotes" class="form-control" rows="4" placeholder="Write notes here..."></textarea>
+            </div>
+
+            <div class="col-12">
+                <label class="form-label">File upload (pdf, doc/docx, xls/xlsx, jpg/png)</label>
+                <input id="dFile" type="file" class="form-control"
+                       accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" />
+                <div id="fileHint" class="form-text">Optional. You can create a document without a file.</div>
+            </div>
+        </div>
+
+        <div class="mt-3 d-flex gap-2">
+            <button id="btnCreate" class="btn btn-primary" type="button">Upload Document</button>
+            <a id="btnCancel" class="btn btn-secondary" href="#">Cancel</a>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+            const apiBase = window.auth.apiBase;
+
+        function qs(name) {
+            const url = new URL(window.location.href);
+            return url.searchParams.get(name);
+        }
+
+
+        async function loadCustomer(customerId) {
+            const res = await fetch(`${apiBase}/api/customers/${customerId}`, { credentials: "include" });
+            if (!res.ok) return null;
+            return await res.json();
+        }
+
+            async function createDocument(customerId) {
+                const btn = document.getElementById("btnCreate");
+                btn.disabled = true;
+
+                try {
+                    const name = document.getElementById("dName").value.trim();
+                    const type = document.getElementById("dType").value;
+                    const notes = document.getElementById("dNotes").value.trim();
+                    const fileInput = document.getElementById("dFile");
+                    const file = (fileInput.files && fileInput.files.length > 0)
+                        ? fileInput.files[0]
+                        : null;
+
+                    if (!name) {
+                        window.notifications.showError("Document name is required.");
+                        return;
+                    }
+
+                    const form = new FormData();
+                    form.append("Name", name);
+                    form.append("Type", type);
+                    form.append("Notes", notes || "");
+
+                    if (file) {
+                        form.append("File", file);
+                    }
+
+                    const res = await fetch(`${apiBase}/api/customers/${customerId}/documents`, {
+                        method: "POST",
+                        credentials: "include",
+                        body: form
+                    });
+
+                    if (!res.ok) {
+                        const errorMessage = await window.auth.getErrorMessage(res);
+                        window.notifications.showError(errorMessage);
+                        return;
+                    }
+
+                    window.notifications.setFlashMessage("Document uploaded successfully.", "success");
+                    window.location.href = `/CustomerDocuments?id=${customerId}`;
+                }
+                catch {
+                    window.notifications.showError("An unexpected error occurred.");
+                }
+                finally {
+                    btn.disabled = false;
+                }
+            }
+
+            (async () => {
+                try {
+                    if (window.auth && !window.currentUser) {
+                        await window.auth.initNavbar();
+                    }
+
+                    const isAdmin = !!(window.auth && window.auth.isAdmin && window.auth.isAdmin(window.currentUser));
+                    if (!isAdmin) {
+                        window.notifications.showError("Access denied. Admin only.");
+                        return;
+                    }
+
+                    const customerIdRaw = qs("customerId");
+                    const customerId = Number(customerIdRaw);
+
+                    if (!customerIdRaw || Number.isNaN(customerId) || customerId <= 0) {
+                        window.notifications.showError("Missing or invalid customerId in URL.");
+                        return;
+                    }
+
+                    const backUrl = `/CustomerDocuments?id=${customerId}`;
+                    document.getElementById("btnCancel").href = backUrl;
+
+                    const cust = await loadCustomer(customerId);
+                    if (cust) {
+                        document.getElementById("subtitle").textContent =
+                            `${cust.name ?? ""} (${cust.email ?? "No email"})`;
+                    }
+
+                    document.getElementById("btnCreate")
+                        .addEventListener("click", () => createDocument(customerId));
+                }
+                catch {
+                    window.notifications.showError("An unexpected error occurred.");
+                }
+            })();
+    </script>
+}

@@ -1,0 +1,173 @@
+﻿@page
+@model ConsultantPlatform.Web.Pages.CustomerEditModel
+@{
+    ViewData["Title"] = "Edit Customer";
+}
+
+<h1>Edit Customer</h1>
+
+
+<input type="hidden" id="customerId" />
+
+<div class="mb-3">
+    <label class="form-label">Name</label>
+    <input id="name" class="form-control" />
+</div>
+
+<div class="mb-3">
+    <label class="form-label">Email</label>
+    <input id="email" class="form-control" />
+</div>
+
+<div class="mb-3">
+    <label class="form-label">Phone</label>
+    <input id="phone" class="form-control" />
+</div>
+
+<div class="mb-3">
+    <label class="form-label">Notes</label>
+    <textarea id="notes" class="form-control"></textarea>
+</div>
+
+<div class="mb-3">
+    <label class="form-label">Status</label>
+    <select id="customerStatus" class="form-select">
+        <option>Active</option>
+        <option>Inactive</option>
+        <option>Lead</option>
+        <option>Project Client</option>
+    </select>
+</div>
+
+<div class="mb-3">
+    <label class="form-label">Service type</label>
+    <select id="serviceType" class="form-select">
+        <option>Branding</option>
+        <option>Social Media</option>
+        <option>Paid Ads</option>
+        <option>SEO</option>
+        <option>Web Design</option>
+        <option>Web Optimization</option>
+        <option>Content Creation</option>
+    </select>
+</div>
+
+<div class="mb-3">
+    <label class="form-label">CVR</label>
+    <input id="cvr" class="form-control" />
+</div>
+
+<div class="mb-3">
+    <label class="form-label">Industry</label>
+    <input id="industry" class="form-control" />
+</div>
+
+<button id="btnSave" type="button" class="btn btn-primary">Save</button>
+
+@section Scripts {
+    <script>
+        const apiBase = window.auth.apiBase;
+
+
+        function getId() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get("id");
+        }
+
+        async function loadCustomer() {
+            const id = getId();
+
+            if (!id) {
+                window.notifications.showError("Invalid customer id in URL.");
+                return;
+            }
+
+            try {
+                const res = await fetch(`${apiBase}/api/customers/${id}`, {
+                    credentials: "include"
+                });
+
+                if (!res.ok) {
+                    const errorMessage = await window.auth.getErrorMessage(res);
+                    window.notifications.showError(errorMessage);
+                    return;
+                }
+
+                const c = await res.json();
+
+                document.getElementById("customerId").value = c.id;
+                document.getElementById("name").value = c.name ?? "";
+                document.getElementById("email").value = c.email ?? "";
+                document.getElementById("phone").value = c.phone ?? "";
+                document.getElementById("notes").value = c.notes ?? "";
+
+                document.getElementById("customerStatus").value = c.status ?? "Lead";
+                document.getElementById("serviceType").value = c.serviceType ?? "Branding";
+                document.getElementById("cvr").value = c.cvr ?? "";
+                document.getElementById("industry").value = c.industry ?? "";
+            }
+            catch {
+                window.notifications.showError("An unexpected error occurred.");
+            }
+        }
+
+        async function saveCustomer() {
+            const btn = document.getElementById("btnSave");
+            btn.disabled = true;
+
+            try {
+                const id = document.getElementById("customerId").value;
+
+                if (!id) {
+                    window.notifications.showError("Customer id is missing.");
+                    return;
+                }
+
+                const name = document.getElementById("name").value.trim();
+                if (!name) {
+                    window.notifications.showError("Name is required.");
+                    return;
+                }
+
+                const payload = {
+                    name: name,
+                    email: document.getElementById("email").value.trim() || null,
+                    phone: document.getElementById("phone").value.trim(),
+                    notes: document.getElementById("notes").value.trim(),
+                    status: document.getElementById("customerStatus").value,
+                    serviceType: document.getElementById("serviceType").value,
+                    cvr: document.getElementById("cvr").value.trim(),
+                    industry: document.getElementById("industry").value.trim()
+                };
+
+                const res = await fetch(`${apiBase}/api/customers/${id}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify(payload)
+                });
+
+                if (!res.ok) {
+                    const errorMessage = await window.auth.getErrorMessage(res);
+                    window.notifications.showError(errorMessage);
+                    return;
+                }
+
+                window.notifications.setFlashMessage("Customer updated successfully.", "success");
+                window.location.href = "/Customers";
+            }
+            catch {
+                window.notifications.showError("An unexpected error occurred.");
+            }
+            finally {
+                btn.disabled = false;
+            }
+        }
+
+        document.getElementById("btnSave").addEventListener("click", saveCustomer);
+
+        document.addEventListener("DOMContentLoaded", function () {
+            loadCustomer();
+        });
+    </script>
+}

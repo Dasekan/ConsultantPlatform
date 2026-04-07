@@ -1,0 +1,303 @@
+﻿@page
+@model ConsultantPlatform.Web.Pages.CustomersModel
+@{
+    ViewData["Title"] = "Customers";
+}
+
+<h1>Customers</h1>
+
+
+<div class="row mb-3">
+    <div class="col-md-4">
+        <label class="form-label">Search</label>
+        <input id="searchBox" class="form-control" placeholder="Search customers..." />
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label">Sort</label>
+        <select id="sortSelect" class="form-select">
+            <option value="created">Newest</option>
+            <option value="name">Name</option>
+            <option value="email">Email</option>
+        </select>
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label">Status</label>
+        <select id="statusFilter" class="form-select">
+            <option value="">All Statuses</option>
+            <option value="Lead">Lead</option>
+            <option value="Active">Active</option>
+            <option value="Project Client">Project Client</option>
+            <option value="Inactive">Inactive</option>
+        </select>
+    </div>
+</div>
+
+<div class="mb-3">
+    <a id="btnCreateCustomer"
+       href="/CustomerCreate"
+       class="btn btn-success"
+       style="display:none;">
+        Create Customer
+    </a>
+</div>
+
+<div>
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+
+                <th>Status</th>
+                <th>Service type</th>
+                <th>CVR</th>
+                <th>Industry</th>
+
+                <th style="width: 220px;" class="text-end">Actions</th>
+            </tr>
+        </thead>
+        <tbody id="customersBody"></tbody>
+    </table>
+</div>
+
+<div id="emptyMessage" class="text-muted" style="display:none;">
+    No customers found.
+</div>
+
+<hr />
+
+
+@section Scripts {
+    <script>
+        const apiBase = window.auth.apiBase;
+
+        let searchTimer = null;
+
+
+        function statusBadge(status) {
+            const s = (status ?? "").toLowerCase();
+
+            if (s === "active") return `<span class="badge bg-success">Active</span>`;
+            if (s === "inactive") return `<span class="badge bg-secondary">Inactive</span>`;
+            if (s === "lead") return `<span class="badge bg-warning text-dark">Lead</span>`;
+            if (s === "project client") return `<span class="badge bg-primary">Project Client</span>`;
+
+            // fallback if something else
+            return `<span class="badge bg-light text-dark">${status ?? ""}</span>`;
+        }
+
+        async function load() {
+            const tbody = document.getElementById("customersBody");
+            const emptyMessage = document.getElementById("emptyMessage");
+
+            tbody.innerHTML = "";
+            emptyMessage.style.display = "none";
+
+            try {
+                const search = document.getElementById("searchBox").value;
+                const sort = document.getElementById("sortSelect").value;
+                const status = document.getElementById("statusFilter").value;
+
+                const url = `${apiBase}/api/customers?search=${encodeURIComponent(search)}&sort=${sort}&status=${encodeURIComponent(status)}`;
+
+                const res = await fetch(url, {
+                    method: "GET",
+                    credentials: "include"
+                });
+
+                if (!res.ok) {
+                    const errorMessage = await window.auth.getErrorMessage(res);
+                    window.notifications.showError(errorMessage);
+                    return;
+                }
+
+                const data = await res.json();
+
+                if (!data || data.length === 0) {
+                    emptyMessage.style.display = "block";
+                    return;
+                }
+
+                const isAdmin = !!(window.auth && window.auth.isAdmin && window.auth.isAdmin(window.currentUser));
+
+                for (const c of data) {
+                    const tr = document.createElement("tr");
+
+                    const tdName = document.createElement("td");
+                    tdName.textContent = c.name ?? "";
+
+                    const tdEmail = document.createElement("td");
+                    tdEmail.textContent = c.email ?? "";
+
+                    const tdPhone = document.createElement("td");
+                    tdPhone.textContent = c.phone ?? "";
+
+                    const tdCustStatus = document.createElement("td");
+                    tdCustStatus.innerHTML = statusBadge(c.status);
+
+                    const tdServiceType = document.createElement("td");
+                    tdServiceType.textContent = c.serviceType ?? "";
+
+                    const tdCvr = document.createElement("td");
+                    tdCvr.textContent = c.cvr ?? "";
+
+                    const tdIndustry = document.createElement("td");
+                    tdIndustry.textContent = c.industry ?? "";
+
+                    const tdActions = document.createElement("td");
+                    tdActions.className = "text-end";
+
+                    const btnDetails = document.createElement("a");
+                    btnDetails.textContent = "Details";
+                    btnDetails.className = "btn btn-sm btn-primary me-2";
+                    btnDetails.href = "/CustomerDetails?id=" + c.id;
+                    tdActions.appendChild(btnDetails);
+
+                    if (isAdmin) {
+                        const group = document.createElement("div");
+                        group.className = "btn-group";
+
+                        const btnToggle = document.createElement("button");
+                        btnToggle.type = "button";
+                        btnToggle.className = "btn btn-sm btn-secondary dropdown-toggle";
+                        btnToggle.setAttribute("data-bs-toggle", "dropdown");
+                        btnToggle.setAttribute("aria-expanded", "false");
+                        btnToggle.textContent = "Manage";
+
+                        const menu = document.createElement("ul");
+                        menu.className = "dropdown-menu dropdown-menu-end";
+
+                        const liProjects = document.createElement("li");
+                        const aProjects = document.createElement("a");
+                        aProjects.className = "dropdown-item";
+                        aProjects.textContent = "Projects";
+                        aProjects.href = "/CustomerProjects?id=" + Number(c.id);
+                        liProjects.appendChild(aProjects);
+                        menu.appendChild(liProjects);
+
+                        const liDocs = document.createElement("li");
+                        const aDocs = document.createElement("a");
+                        aDocs.className = "dropdown-item";
+                        aDocs.textContent = "Documents";
+                        aDocs.href = `/CustomerDocuments?id=${c.id}`;
+                        liDocs.appendChild(aDocs);
+                        menu.appendChild(liDocs);
+
+                        const liDivider = document.createElement("li");
+                        liDivider.innerHTML = `<hr class="dropdown-divider">`;
+                        menu.appendChild(liDivider);
+
+                        const liEdit = document.createElement("li");
+                        const aEdit = document.createElement("a");
+                        aEdit.className = "dropdown-item";
+                        aEdit.textContent = "Edit";
+                        aEdit.href = "/CustomerEdit?id=" + c.id;
+                        liEdit.appendChild(aEdit);
+                        menu.appendChild(liEdit);
+
+                        const liDelete = document.createElement("li");
+                        const btnDelete = document.createElement("button");
+                        btnDelete.type = "button";
+                        btnDelete.className = "dropdown-item text-danger";
+                        btnDelete.textContent = "Delete";
+
+                        btnDelete.addEventListener("click", async () => {
+                            const confirmed = await window.notifications.confirmAction(
+                                "Are you sure you want to delete this customer?"
+                            );
+
+                            if (!confirmed) return;
+
+                            try {
+                                const delRes = await fetch(`${apiBase}/api/customers/${c.id}`, {
+                                    method: "DELETE",
+                                    credentials: "include"
+                                });
+
+                                if (!delRes.ok) {
+                                    const msg = await window.auth.getErrorMessage(delRes);
+                                    window.notifications.showError(msg);
+                                    return;
+                                }
+
+                                window.notifications.showSuccess("Customer deleted successfully.");
+                                await load();
+                            }
+                            catch {
+                                window.notifications.showError("An unexpected error occurred.");
+                            }
+                        });
+
+                        liDelete.appendChild(btnDelete);
+                        menu.appendChild(liDelete);
+
+                        group.appendChild(btnToggle);
+                        group.appendChild(menu);
+                        tdActions.appendChild(group);
+                    }
+                    else {
+                        const btnProjects = document.createElement("a");
+                        btnProjects.textContent = "Projects";
+                        btnProjects.className = "btn btn-sm btn-primary";
+                        btnProjects.href = "/CustomerProjects?id=" + c.id;
+                        tdActions.appendChild(btnProjects);
+                    }
+
+                    tr.appendChild(tdName);
+                    tr.appendChild(tdEmail);
+                    tr.appendChild(tdPhone);
+                    tr.appendChild(tdCustStatus);
+                    tr.appendChild(tdServiceType);
+                    tr.appendChild(tdCvr);
+                    tr.appendChild(tdIndustry);
+                    tr.appendChild(tdActions);
+
+                    tbody.appendChild(tr);
+                }
+            }
+            catch {
+                window.notifications.showError("An unexpected error occurred.");
+            }
+        }
+
+        // Init page
+        (async () => {
+            try {
+                if (window.auth && window.auth.initNavbar && !window.currentUser) {
+                    await window.auth.initNavbar();
+                }
+
+                const isAdmin = !!(window.auth && window.auth.isAdmin && window.auth.isAdmin(window.currentUser));
+
+                const btnCreate = document.getElementById("btnCreateCustomer");
+                if (btnCreate) {
+                    btnCreate.style.display = isAdmin ? "inline-block" : "none";
+                }
+
+                document.getElementById("searchBox")
+                    .addEventListener("input", () => {
+                        clearTimeout(searchTimer);
+
+                        searchTimer = setTimeout(() => {
+                            load();
+                        }, 300);
+                    });
+
+                document.getElementById("sortSelect")
+                    .addEventListener("change", load);
+
+                document.getElementById("statusFilter")
+                    .addEventListener("change", load);
+
+                await load();
+            }
+            catch {
+                window.notifications.showError("An unexpected error occurred.");
+            }
+        })();
+
+    </script>
+}
